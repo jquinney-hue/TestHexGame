@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hex Hacker Escape</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #050505;
+            color: #33ff33;
+            user-select: none;
+        }
+
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .interactive-object {
+            transition: all 0.3s ease;
+            cursor: crosshair;
+            filter: drop-shadow(0 0 10px rgba(51, 255, 51, 0.2));
+        }
+
+        .interactive-object:hover {
+            transform: scale(1.1);
+            filter: drop-shadow(0 0 20px rgba(51, 255, 51, 0.8));
+        }
+
+        .glitch {
+            animation: glitch-anim 2s infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+
+        .modal-bg {
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(4px);
+        }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col items-center justify-center">
+
+    <div class="crt-overlay"></div>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="relative w-full max-w-4xl h-[600px] border-4 border-green-500 rounded-lg overflow-hidden bg-gray-900 shadow-[0_0_30px_rgba(51,255,51,0.3)] flex flex-col">
+        
+        <!-- Header / Status Bar -->
+        <div class="bg-green-900/30 border-b-2 border-green-500 p-3 flex justify-between items-center z-10">
+            <div>
+                <span class="text-green-400">LOCATION: </span><span id="location-text">START_SCREEN</span>
+            </div>
+            <div>
+                <span class="text-green-400">LEVEL: </span><span id="level-text">0/3</span>
+            </div>
+        </div>
+
+        <!-- Scene Area -->
+        <div id="scene-area" class="flex-grow relative flex items-center justify-center bg-cover bg-center" style="background-image: radial-gradient(circle, #1a1a1a 0%, #000000 100%);">
+            
+            <!-- Start Screen -->
+            <div id="start-screen" class="text-center z-10">
+                <h1 class="text-6xl font-bold mb-4 glitch text-green-400">HEX HACKER</h1>
+                <p class="text-xl mb-8 max-w-lg mx-auto text-green-200">You are trapped in a legacy mainframe. To escape, you must find the security nodes and convert their Hexadecimal codes into Denary (Decimal) access keys.</p>
+                <div class="mb-6 text-sm text-green-500">Enter Student Name for the Final Report:</div>
+                <input type="text" id="student-name" placeholder="Agent Name..." class="bg-black border-2 border-green-500 text-green-400 px-4 py-2 mb-6 text-center outline-none focus:bg-green-950 uppercase" autocomplete="off">
+                <br>
+                <button onclick="startGame()" class="px-8 py-3 bg-green-500 text-black font-bold text-xl hover:bg-green-400 hover:shadow-[0_0_20px_#33ff33] transition-all rounded">INITIATE ESCAPE SEQUENCE</button>
+            </div>
+
+            <!-- Point and Click Environment -->
+            <div id="environment" class="hidden absolute inset-0 w-full h-full">
+                <div id="narrative-box" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 border border-green-500 p-4 text-center min-w-[300px] rounded">
+                    <p id="narrative-text" class="text-lg">Look around the room...</p>
+                </div>
+
+                <!-- The clickable object will be injected here via JS -->
+                <div id="interactive-zone" class="absolute w-full h-full flex items-center justify-center">
+                    <!-- Object goes here -->
+                </div>
+            </div>
+
+            <!-- End Screen -->
+            <div id="end-screen" class="hidden text-center z-10 w-full px-8">
+                <h2 class="text-5xl font-bold mb-6 text-green-400">SYSTEM BREACHED</h2>
+                <p class="text-2xl mb-6 text-green-200">Mainframe escape successful.</p>
+                
+                <div class="bg-black/60 border border-green-500 p-6 rounded-lg mb-8 max-w-2xl mx-auto text-left">
+                    <h3 class="text-xl mb-4 text-center underline">Performance Summary</h3>
+                    <ul id="performance-list" class="space-y-2 text-lg">
+                        <!-- Filled by JS -->
+                    </ul>
+                </div>
+
+                <button onclick="generatePDF()" class="px-8 py-3 bg-green-500 text-black font-bold text-xl hover:bg-green-400 hover:shadow-[0_0_20px_#33ff33] transition-all rounded flex items-center justify-center mx-auto gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    DOWNLOAD PDF REPORT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interaction Modal (Question) -->
+    <div id="question-modal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center hidden">
+        <div class="bg-black border-4 border-green-500 p-8 rounded-lg max-w-md w-full shadow-[0_0_40px_rgba(51,255,51,0.4)] relative">
+            <button onclick="closeModal()" class="absolute top-2 right-4 text-green-500 hover:text-white text-2xl font-bold">&times;</button>
+            
+            <h3 class="text-2xl font-bold mb-2 border-b border-green-500 pb-2">SECURITY NODE ENCRYPTED</h3>
+            <p class="mb-6 text-green-300">Convert the following 2-digit Hexadecimal value to Denary (Base-10) to bypass security.</p>
+            
+            <div class="text-center mb-8">
+                <span class="text-sm text-gray-400 block mb-1">HEXADECIMAL TARGET</span>
+                <span id="hex-display" class="text-6xl font-bold text-white tracking-widest bg-gray-900 px-6 py-2 rounded border border-gray-700 block">FF</span>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm text-green-400 mb-2">ENTER DENARY EQUIVALENT:</label>
+                <div class="flex gap-2">
+                    <input type="number" id="denary-input" class="flex-grow bg-gray-900 border-2 border-green-500 text-white px-4 py-3 text-2xl outline-none focus:bg-gray-800" placeholder="0">
+                    <button onclick="checkAnswer()" class="bg-green-600 hover:bg-green-500 text-black font-bold px-6 py-3 transition-colors">SUBMIT</button>
+                </div>
+            </div>
+
+            <div id="feedback-msg" class="h-6 text-center text-red-500 font-bold hidden">
+                INCORRECT CODE. TRY AGAIN.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        const gameState = {
+            playerName: "UNKNOWN AGENT",
+            currentLevelIndex: 0,
+            startTime: null,
+            levels: [
+                {
+                    id: 1,
+                    location: "SECTOR 1: THE TERMINAL ROOM",
+                    narrative: "The room is dark. A single maintenance terminal is powered on. Click it to slice the connection.",
+                    objectSvg: `<svg class="w-32 h-32 text-green-500" fill="currentColor" viewBox="0 0 24 24"><path d="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z" /></svg>`,
+                    hexValue: "",
+                    denaryAnswer: 0,
+                    attempts: 0,
+                    minHex: 16, // 10 hex
+                    maxHex: 63  // 3F hex
+                },
+                {
+                    id: 2,
+                    location: "SECTOR 2: THE BLAST CORRIDOR",
+                    narrative: "A reinforced blast door blocks the way. The keypad requires a numeric override.",
+                    objectSvg: `<svg class="w-24 h-48 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8,3C6.89,3 6,3.89 6,5V21H18V5C18,3.89 17.11,3 16,3H8M8,5H16V19H8V5M10,11H12V13H10V11Z" /></svg>`,
+                    hexValue: "",
+                    denaryAnswer: 0,
+                    attempts: 0,
+                    minHex: 64, // 40 hex
+                    maxHex: 159 // 9F hex
+                },
+                {
+                    id: 3,
+                    location: "SECTOR 3: MAINFRAME CORE",
+                    narrative: "The central core router. Input the final sequence to unlock the exit hatch.",
+                    objectSvg: `<svg class="w-40 h-40 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H4V13H1V15H4V17H1V19H4C2.89,19 2,19.89 2,21V23H22V21C22,19.89 21.11,19 20,19H23V17H20V15H23V13H20V11H23V9H20C21.11,9 22,8.11 22,7V3C22,1.89 21.11,1 20,1H4M4,3H20V7H4V3M10,4V6H14V4H10M4,11H20V19H4V11M6,13V17H10V13H6M12,13V17H18V13H12Z" /></svg>`,
+                    hexValue: "",
+                    denaryAnswer: 0,
+                    attempts: 0,
+                    minHex: 160, // A0 hex
+                    maxHex: 255  // FF hex
+                }
+            ]
+        };
+
+        // Initialize Game
+        function startGame() {
+            const nameInput = document.getElementById('student-name').value.trim();
+            if(nameInput) {
+                gameState.playerName = nameInput;
+            }
+            
+            gameState.startTime = new Date();
+            
+            // Generate Hex values for all levels
+            gameState.levels.forEach(level => {
+                const randomDenary = Math.floor(Math.random() * (level.maxHex - level.minHex + 1)) + level.minHex;
+                level.denaryAnswer = randomDenary;
+                level.hexValue = randomDenary.toString(16).toUpperCase().padStart(2, '0');
+            });
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('environment').classList.remove('hidden');
+            
+            loadLevel();
+        }
+
+        // Load specific level
+        function loadLevel() {
+            const level = gameState.levels[gameState.currentLevelIndex];
+            
+            document.getElementById('location-text').textContent = level.location;
+            document.getElementById('level-text').textContent = `${level.id}/3`;
+            document.getElementById('narrative-text').textContent = level.narrative;
+
+            const interactiveZone = document.getElementById('interactive-zone');
+            
+            // Generate random position for the object to make it "point and click"
+            // Keeping it roughly in the center-ish area so it's not cut off
+            const topPos = 20 + Math.random() * 40; 
+            const leftPos = 20 + Math.random() * 60;
+
+            interactiveZone.innerHTML = `
+                <div class="interactive-object absolute" style="top: ${topPos}%; left: ${leftPos}%;" onclick="openModal()" title="Investigate Object">
+                    ${level.objectSvg}
+                    <div class="text-center mt-2 text-sm animate-pulse">CLICK TO HACK</div>
+                </div>
+            `;
+        }
+
+        // Open question modal
+        function openModal() {
+            const level = gameState.levels[gameState.currentLevelIndex];
+            document.getElementById('hex-display').textContent = level.hexValue;
+            document.getElementById('denary-input').value = '';
+            document.getElementById('feedback-msg').classList.add('hidden');
+            document.getElementById('question-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('denary-input').focus(), 100);
+        }
+
+        function closeModal() {
+            document.getElementById('question-modal').classList.add('hidden');
+        }
+
+        // Handle enter key
+        document.getElementById('denary-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // Check the user's answer
+        function checkAnswer() {
+            const level = gameState.levels[gameState.currentLevelIndex];
+            const inputVal = parseInt(document.getElementById('denary-input').value, 10);
+            const feedback = document.getElementById('feedback-msg');
+
+            level.attempts++;
+
+            if (inputVal === level.denaryAnswer) {
+                // Correct!
+                closeModal();
+                gameState.currentLevelIndex++;
+                
+                if (gameState.currentLevelIndex >= gameState.levels.length) {
+                    endGame();
+                } else {
+                    // Quick flash effect for success
+                    document.getElementById('scene-area').style.backgroundColor = "rgba(51, 255, 51, 0.3)";
+                    setTimeout(() => {
+                        document.getElementById('scene-area').style.backgroundColor = "";
+                        loadLevel();
+                    }, 300);
+                }
+            } else {
+                // Incorrect
+                feedback.textContent = `INCORRECT. CONNECTION REJECTED. (ATTEMPTS: ${level.attempts})`;
+                feedback.classList.remove('hidden');
+                feedback.classList.remove('text-red-500');
+                void feedback.offsetWidth; // trigger reflow
+                feedback.classList.add('text-red-500');
+            }
+        }
+
+        // End the game and show results
+        function endGame() {
+            document.getElementById('environment').classList.add('hidden');
+            document.getElementById('location-text').textContent = "SYSTEM ESCAPED";
+            document.getElementById('level-text').textContent = "COMPLETE";
+            
+            const endScreen = document.getElementById('end-screen');
+            endScreen.classList.remove('hidden');
+
+            const perfList = document.getElementById('performance-list');
+            perfList.innerHTML = '';
+            
+            let totalAttempts = 0;
+
+            gameState.levels.forEach(level => {
+                totalAttempts += level.attempts;
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center border-b border-green-800 pb-2";
+                
+                const accuracy = level.attempts === 1 ? 'Perfect (1 attempt)' : `${level.attempts} attempts`;
+                const color = level.attempts === 1 ? 'text-green-400' : (level.attempts <= 3 ? 'text-yellow-400' : 'text-red-400');
+
+                li.innerHTML = `
+                    <span>Level ${level.id} (Hex: <span class="font-bold">${level.hexValue}</span>)</span>
+                    <span class="${color}">${accuracy}</span>
+                `;
+                perfList.appendChild(li);
+            });
+
+            // Add summary footer
+            const summaryLi = document.createElement('li');
+            summaryLi.className = "flex justify-between items-center pt-2 font-bold text-xl";
+            summaryLi.innerHTML = `<span>TOTAL ATTEMPTS:</span> <span>${totalAttempts}</span>`;
+            perfList.appendChild(summaryLi);
+        }
+
+        // Generate PDF using jsPDF
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Set up fonts and colors
+            doc.setFont("courier", "bold");
+            doc.setTextColor(0, 100, 0); // Dark green
+            doc.setFontSize(22);
+            doc.text("HEXADECIMAL HACKER - MISSION REPORT", 105, 20, null, null, "center");
+            
+            doc.setDrawColor(0, 100, 0);
+            doc.line(20, 25, 190, 25);
+
+            doc.setFontSize(14);
+            doc.setTextColor(0, 0, 0);
+            doc.setFont("courier", "normal");
+            
+            const dateStr = new Date().toLocaleString();
+            
+            doc.text(`AGENT NAME: ${gameState.playerName.toUpperCase()}`, 20, 40);
+            doc.text(`MISSION DATE: ${dateStr}`, 20, 50);
+            doc.text(`MISSION STATUS: SUCCESSFUL ESCAPE`, 20, 60);
+
+            doc.line(20, 65, 190, 65);
+
+            doc.setFontSize(16);
+            doc.setFont("courier", "bold");
+            doc.text("CONVERSION LOGS", 20, 80);
+
+            doc.setFontSize(12);
+            doc.setFont("courier", "normal");
+
+            let yPos = 95;
+            let totalAttempts = 0;
+            let perfectScores = 0;
+
+            gameState.levels.forEach((level) => {
+                totalAttempts += level.attempts;
+                if (level.attempts === 1) perfectScores++;
+
+                doc.setFont("courier", "bold");
+                doc.text(`LEVEL ${level.id} - ${level.location}`, 20, yPos);
+                
+                doc.setFont("courier", "normal");
+                yPos += 8;
+                doc.text(`Target Hexadecimal: ${level.hexValue}`, 30, yPos);
+                yPos += 8;
+                doc.text(`Correct Denary:   ${level.denaryAnswer}`, 30, yPos);
+                yPos += 8;
+                doc.text(`Attempts Used:    ${level.attempts}`, 30, yPos);
+                yPos += 15;
+            });
+
+            doc.line(20, yPos, 190, yPos);
+            yPos += 10;
+
+            doc.setFontSize(16);
+            doc.setFont("courier", "bold");
+            doc.text("PERFORMANCE SUMMARY", 20, yPos);
+            
+            yPos += 10;
+            doc.setFontSize(12);
+            doc.setFont("courier", "normal");
+            doc.text(`Total Conversion Attempts: ${totalAttempts}`, 20, yPos);
+            
+            yPos += 10;
+            let grade = "";
+            if (totalAttempts === 3) grade = "EXPERT HACKER (S-Tier)";
+            else if (totalAttempts <= 5) grade = "SKILLED SLICER (A-Tier)";
+            else if (totalAttempts <= 8) grade = "NOVICE OPERATOR (B-Tier)";
+            else grade = "NEEDS MORE TRAINING (C-Tier)";
+
+            doc.setFont("courier", "bold");
+            doc.text(`FINAL EVALUATION: ${grade}`, 20, yPos);
+
+            // Save the PDF
+            doc.save(`HexHacker_Report_${gameState.playerName.replace(/\s+/g, '_')}.pdf`);
+        }
+    </script>
+</body>
+</html>
